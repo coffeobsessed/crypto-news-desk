@@ -682,16 +682,15 @@ function buildFallbackLead(context, existingLeads = []) {
 }
 
 function buildRelaxedLead(context, index) {
-  const subject = detectSubject(context.title, context.firstSentence, context.evidence);
   const sourceTitle = asSentence(rewriteSourceHeadline(context.title));
   const fact = asSentence(cleanSentence(context.evidence.sentences[index] || context.firstSentence || context.title));
   const secondFact = asSentence(context.evidence.sentences.find((sentence) => !sameSentence(sentence, fact) && !sameSentence(sentence, context.title)) || context.firstSentence || "");
   const figure = context.evidence.figures[index] || context.evidence.figures[0] || "";
-  const figureClause = figure ? ` The key figure in the source is ${figure}.` : "";
+  const figureClause = figure ? ` The ${figure} figure gives the item a clear numerical peg.` : "";
   const options = [
     `${sourceTitle} ${fact && !sameSentence(fact, sourceTitle) ? fact : secondFact}${figureClause}`,
-    `${subject} is the main actor in the story. ${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}${figureClause}`,
-    `The article centers on ${subject}. ${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}${figureClause}`
+    `${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}${figureClause}`,
+    `${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}${figureClause}`.trim()
   ];
   return limitLead(options[index] || options[0]);
 }
