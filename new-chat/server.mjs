@@ -34,6 +34,24 @@ const sources = [
     name: "The Block",
     home: "https://www.theblock.co/",
     feeds: ["https://www.theblock.co/rss.xml", "https://www.theblock.co/rss"]
+  },
+  {
+    id: "beincrypto",
+    name: "BeInCrypto",
+    home: "https://beincrypto.com/",
+    feeds: ["https://beincrypto.com/feed/"]
+  },
+  {
+    id: "forklog",
+    name: "ForkLog",
+    home: "https://forklog.com/",
+    feeds: ["https://forklog.com/feed", "https://forklog.com/feed/"]
+  },
+  {
+    id: "incrypted",
+    name: "Incrypted",
+    home: "https://incrypted.com/",
+    feeds: ["https://incrypted.com/feed/", "https://incrypted.com/news/feed/"]
   }
 ];
 
