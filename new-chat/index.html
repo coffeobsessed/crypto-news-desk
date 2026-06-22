@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crypto News Desk</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Crypto News Desk</p>
+          <h1>Генератор криптоновостей</h1>
+        </div>
+        <button id="refreshBtn" class="primary" type="button">Обновить</button>
+      </section>
+
+      <section class="workspace">
+        <aside class="feedPane">
+          <div class="controls">
+            <label class="searchBox">
+              <span>Поиск</span>
+              <input id="searchInput" type="search" placeholder="BTC, SEC, hack...">
+            </label>
+            <div class="tabs" id="categoryTabs" aria-label="Рубрики"></div>
+          </div>
+          <div class="feedMeta">
+            <span id="freshness">Только материалы за 48 часов</span>
+            <span id="count"></span>
+          </div>
+          <div id="status" class="status">Загрузка свежих новостей...</div>
+          <div id="feed" class="feed"></div>
+        </aside>
+
+        <section class="detailPane">
+          <div class="manualBox">
+            <div class="manualHead">
+              <h2>Ручная вставка</h2>
+              <button id="manualToggle" class="ghost" type="button">Открыть</button>
+            </div>
+            <form id="manualForm" class="manualForm hidden">
+              <input id="manualTitle" placeholder="Заголовок первоисточника">
+              <textarea id="manualText" rows="7" placeholder="Вставьте текст статьи или фрагмент с фактами"></textarea>
+              <button class="primary" type="submit">Сделать варианты</button>
+            </form>
+          </div>
+
+          <article id="detail" class="detail empty">
+            <p class="eyebrow">Выберите новость</p>
+            <h2>Здесь появятся заголовки и лиды</h2>
+            <p>Нажмите на любую карточку слева. Результат откроется сразу в этой панели.</p>
+          </article>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
