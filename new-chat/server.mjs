@@ -44,6 +44,22 @@ const categoryRules = [
   ["hacks", "Взломы", /hack|exploit|stolen|phish|drain|breach|attack|scam|fraud|launder|security|vulnerab/i]
 ];
 
+const editorialRules = {
+  headlines: [
+    "Заголовок: 5-10 слов, активный глагол и конкретный субъект.",
+    "Заголовок: без кликбейта, вопросов, восклицаний, двоеточий и пересказа заголовка первоисточника.",
+    "Заголовок: цифры, имена и причинно-следственные связи только из извлеченного текста."
+  ],
+  leads: [
+    "Лид: 1-2 предложения, отдельная мысль, а не повтор заголовка.",
+    "Лид: сначала главный факт, затем контекст; без оценочных слов и неподтвержденных выводов.",
+    "Лид: не использовать служебный текст, рекламу, биржевые тикеры и byline."
+  ]
+};
+
+const headlineBannedPattern = /key figure|what we know|here’s|here's|everything to know|you need to know|explained|could mean|may mean|question mark/i;
+const leadBannedPattern = /sign up|subscribe|newsletter|advertisement|read more|related:|this article|in this article|click here/i;
+
 const mime = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -305,7 +321,7 @@ export function buildDrafts(input) {
     figureSentence || secondSentence || leadBase
   ]
     .map((lead) => limitLead(normalizeLead(cleanSentence(lead), safeTitle)))
-    .filter((lead) => isUsefulSentence(lead) && !sameSentence(lead, safeTitle) && !sameSentence(sanitizeHeadline(lead), safeTitle))
+    .filter((lead) => !violatesLeadRules(lead, safeTitle))
     .filter((lead, index, list) => list.findIndex((other) => tooSimilar(lead, other)) === index);
 
   return {
@@ -320,7 +336,9 @@ export function buildDrafts(input) {
     guardrails: [
       "Все черновики построены из заголовка, описания и текста первоисточника.",
       "Цифры и имена берутся только из извлеченного текста.",
-      "Перед публикацией проверьте цитаты и числовые данные по ссылке на первоисточник."
+      "Перед публикацией проверьте цитаты и числовые данные по ссылке на первоисточник.",
+      ...editorialRules.headlines,
+      ...editorialRules.leads
     ]
   };
 }
@@ -423,11 +441,7 @@ function ensureThreeHeadlines(candidates, originalTitle) {
   const cleaned = [];
   for (const candidate of candidates) {
     const headline = limitHeadline(sanitizeHeadline(candidate));
-    if (headline.length < 18) continue;
-    if (wordCount(headline) > 10) continue;
-    if (!hasHeadlineVerb(headline)) continue;
-    if (/key figure|what we know|here’s|here's/i.test(headline)) continue;
-    if (sameSentence(headline, originalTitle)) continue;
+    if (violatesHeadlineRules(headline, originalTitle)) continue;
     if (cleaned.some((item) => sameSentence(item, headline))) continue;
     cleaned.push(headline);
     if (cleaned.length === 3) break;
@@ -445,11 +459,12 @@ function ensureThreeHeadlines(candidates, originalTitle) {
 
 function ensureUsefulLeads(leads, context) {
   const useful = [];
-  for (const lead of leads.filter(isUsefulSentence)) {
+  for (const lead of leads.filter((item) => !violatesLeadRules(item, context.title))) {
     if (!useful.some((item) => tooSimilar(item, lead))) useful.push(lead);
   }
   const facts = context.evidence.sentences
     .filter((sentence) => !sameSentence(sentence, context.title))
+    .filter((sentence) => !violatesLeadRules(sentence, context.title))
     .filter((sentence) => !useful.some((lead) => tooSimilar(lead, sentence)))
     .slice(0, 3);
   for (const fact of facts) {
@@ -458,10 +473,36 @@ function ensureUsefulLeads(leads, context) {
   }
   while (useful.length < 2) {
     const fallback = limitLead(context.firstSentence || context.title);
-    if (!useful.some((lead) => tooSimilar(lead, fallback))) useful.push(fallback);
+    if (!violatesLeadRules(fallback, context.title) && !useful.some((lead) => tooSimilar(lead, fallback))) useful.push(fallback);
     else break;
   }
   return useful.slice(0, 2);
+}
+
+function violatesHeadlineRules(headline, originalTitle) {
+  const text = cleanSentence(headline);
+  const words = wordCount(text);
+  return text.length < 18
+    || words < 5
+    || words > 10
+    || !hasHeadlineVerb(text)
+    || /[?!]|\.{3}|:/.test(text)
+    || /^(how|why|what|when|where)\b/i.test(text)
+    || headlineBannedPattern.test(text)
+    || sameSentence(text, originalTitle);
+}
+
+function violatesLeadRules(lead, title) {
+  const text = cleanSentence(lead);
+  const sentenceCount = sentenceSplit(text).length;
+  return !isUsefulSentence(text)
+    || text.length > 260
+    || sentenceCount > 2
+    || sameSentence(text, title)
+    || sameSentence(sanitizeHeadline(text), title)
+    || tooSimilar(text, title)
+    || /[?!]/.test(text)
+    || leadBannedPattern.test(text);
 }
 
 function detectSubject(title, firstSentence, evidence) {
