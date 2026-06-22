@@ -81,7 +81,7 @@ const MAX_HEADLINE_CORE_CHARS = 64;
 const TARGET_MIN_LEAD_WORDS = 35;
 const MIN_LEAD_WORDS = 20;
 const MAX_LEAD_WORDS = 90;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 const editorialParameters = {
   task: "Prepare headline and lead options from the source material for a news writer. Do not publish a finished article; give the writer strong editorial options to choose from.",
@@ -429,10 +429,16 @@ export async function buildDraftsWithAi(input) {
       ai: { used: false, error: error.message },
       guardrails: [
         ...fallback.guardrails,
-        "AI generation was unavailable, so these drafts used the local fallback generator."
+        `AI generation was unavailable: ${safeAiError(error.message)}`
       ]
     };
   }
+}
+
+function safeAiError(message = "") {
+  return cleanText(message)
+    .replace(/sk-[A-Za-z0-9_-]+/g, "[hidden API key]")
+    .slice(0, 220) || "unknown error";
 }
 
 async function requestAiDrafts(input, fallback) {
