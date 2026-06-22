@@ -7,10 +7,21 @@ const state = {
 
 const categories = [
   ["all", "Все"],
-  ["market", "Рынок"],
-  ["regulation", "Регулирование"],
+  ["bitcoin", "Bitcoin"],
+  ["ethereum", "Ethereum"],
+  ["altcoins", "Altcoins"],
+  ["prediction-markets", "Prediction markets"],
+  ["regulation", "Regulation"],
+  ["crypto-companies", "Crypto Companies"],
+  ["crypto-etf", "Crypto ETF"],
+  ["bitcoin-mining", "Bitcoin Mining"],
   ["defi", "DeFi"],
-  ["hacks", "Взломы"],
+  ["stablecoins", "Stablecoins"],
+  ["trading", "Trading"],
+  ["cex", "CEX"],
+  ["dex", "DEX"],
+  ["hacks", "Hacks"],
+  ["scam", "Scam"],
   ["other", "Другое"]
 ];
 

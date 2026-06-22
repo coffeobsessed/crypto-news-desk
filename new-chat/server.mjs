@@ -38,10 +38,21 @@ const sources = [
 ];
 
 const categoryRules = [
-  ["regulation", "Регулирование", /sec|cftc|regulat|court|lawsuit|bill|senate|treasury|ofac|sanction|license|policy|cbdc|налог|закон/i],
-  ["market", "Рынок", /bitcoin|btc|ether|eth|price|market|trading|etf|stock|shares|treasury|fund|investor|rally|drop|liquidat|inflation|fed/i],
-  ["defi", "DeFi", /defi|dao|dex|lending|staking|yield|liquidity|uniswap|aave|compound|maker|curve|stablecoin/i],
-  ["hacks", "Взломы", /hack|exploit|stolen|phish|drain|breach|attack|scam|fraud|launder|security|vulnerab/i]
+  ["hacks", "Hacks", /hack|exploit|stolen|drain|breach|attack|security incident|vulnerab|compromis|private key|wallet drain/i],
+  ["scam", "Scam", /scam|fraud|phish|rug pull|ponzi|fake|impersonat|launder|pig butcher|romance scam|illicit/i],
+  ["crypto-etf", "Crypto ETF", /\b(etf|exchange-traded fund|spot fund|s-1|19b-4)\b/i],
+  ["bitcoin-mining", "Bitcoin Mining", /bitcoin mining|btc mining|mining rig|hashrate|hash rate|miner|miners|mining company|mining difficulty/i],
+  ["prediction-markets", "Prediction markets", /prediction market|polymarket|kalshi|predictit|betting market|event contract|forecast market/i],
+  ["stablecoins", "Stablecoins", /stablecoin|usdt|usdc|dai|tether|circle|paxos|paypal usd|pyusd|fdusd|frax/i],
+  ["cex", "CEX", /centralized exchange|\bcex\b|binance|coinbase|kraken|okx|bybit|bitget|kucoin|gate\.io|mexc|upbit|bithumb/i],
+  ["dex", "DEX", /decentralized exchange|\bdex\b|uniswap|curve|pancakeswap|raydium|orca|sushiswap|balancer|trader joe/i],
+  ["ethereum", "Ethereum", /ethereum|ether|\beth\b|erc-20|erc20|vitalik|mainnet|validator|validators|gas fee|staking rewards/i],
+  ["defi", "DeFi", /\bdefi\b|dao|lending|staking|yield|liquidity|aave|compound|makerdao|maker|restaking|eigenlayer|liquid staking/i],
+  ["regulation", "Regulation", /sec|cftc|regulat|court|lawsuit|bill|senate|treasury|ofac|sanction|license|policy|cbdc|lawmakers?|compliance|enforcement|settlement|fine/i],
+  ["crypto-companies", "Crypto Companies", /crypto company|crypto firm|startup|raises|funding round|acquisition|merger|partnership|rebrand|layoffs?|ceo|founder|launches|company said/i],
+  ["trading", "Trading", /trading|trader|price|market|rally|drop|fell|surge|liquidat|volume|open interest|futures|options|technical analysis|support|resistance/i],
+  ["bitcoin", "Bitcoin", /bitcoin|\bbtc\b|satoshi|lightning network|ordinals|runes/i],
+  ["altcoins", "Altcoins", /solana|\bsol\b|xrp|ripple|cardano|\bada\b|dogecoin|doge|toncoin|\bton\b|bnb|avalanche|avax|polygon|matic|chainlink|link|litecoin|ltc|shiba|pepe|aptos|sui|near|polkadot|dot|cosmos|atom|tron|trx/i]
 ];
 
 const headlineBannedPattern = /key figure|what we know|here’s|here's|everything to know|you need to know|explained|could mean|may mean|question mark/i;
@@ -397,7 +408,9 @@ function makeHeadlines(context) {
   const categoryNoun = category.id === "regulation" ? "regulatory test"
     : category.id === "hacks" ? "security scare"
     : category.id === "defi" ? "DeFi test"
-    : "market test";
+    : category.id === "crypto-etf" ? "ETF pricing test"
+    : category.id === "trading" ? "trading test"
+    : `${category.label || "crypto"} test`;
   const candidates = [
     joinHeadline(subject, action, object),
     figure ? joinHeadline(subject, "faces", `${figure} ${categoryNoun}`) : joinHeadline(subject, "puts", `${categoryNoun} in focus`),
@@ -811,8 +824,14 @@ function detectObject(title, firstSentence, subject) {
 function buildWhyItMattersHeadline(subject, category) {
   if (category.id === "regulation") return `${subject} tests crypto’s regulatory mood`;
   if (category.id === "hacks") return `${subject} puts crypto security back on alert`;
+  if (category.id === "scam") return `${subject} puts crypto fraud risks back in focus`;
   if (category.id === "defi") return `${subject} raises a new DeFi question`;
-  if (category.id === "market") return `${subject} gives crypto traders a new signal`;
+  if (category.id === "crypto-etf") return `${subject} raises a new crypto ETF question`;
+  if (category.id === "trading") return `${subject} gives crypto traders a new signal`;
+  if (category.id === "bitcoin-mining") return `${subject} puts Bitcoin mining economics in focus`;
+  if (category.id === "stablecoins") return `${subject} raises a new stablecoin question`;
+  if (category.id === "cex") return `${subject} puts centralized exchanges back in focus`;
+  if (category.id === "dex") return `${subject} puts decentralized trading back in focus`;
   return `${subject} puts crypto trust back in focus`;
 }
 
