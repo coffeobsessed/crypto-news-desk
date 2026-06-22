@@ -44,19 +44,6 @@ const categoryRules = [
   ["hacks", "Взломы", /hack|exploit|stolen|phish|drain|breach|attack|scam|fraud|launder|security|vulnerab/i]
 ];
 
-const editorialRules = {
-  headlines: [
-    "Заголовок: 5-10 слов, активный глагол и конкретный субъект.",
-    "Заголовок: без кликбейта, вопросов, восклицаний, двоеточий и пересказа заголовка первоисточника.",
-    "Заголовок: цифры, имена и причинно-следственные связи только из извлеченного текста."
-  ],
-  leads: [
-    "Лид: 1-2 предложения, отдельная мысль, а не повтор заголовка.",
-    "Лид: сначала главный факт, затем контекст; без оценочных слов и неподтвержденных выводов.",
-    "Лид: не использовать служебный текст, рекламу, биржевые тикеры и byline."
-  ]
-};
-
 const headlineBannedPattern = /key figure|what we know|here’s|here's|everything to know|you need to know|explained|could mean|may mean|question mark/i;
 const leadBannedPattern = /sign up|subscribe|newsletter|advertisement|read more|related:|this article|in this article|click here/i;
 
@@ -336,16 +323,13 @@ export function buildDrafts(input) {
     guardrails: [
       "Все черновики построены из заголовка, описания и текста первоисточника.",
       "Цифры и имена берутся только из извлеченного текста.",
-      "Перед публикацией проверьте цитаты и числовые данные по ссылке на первоисточник.",
-      ...editorialRules.headlines,
-      ...editorialRules.leads
+      "Перед публикацией проверьте цитаты и числовые данные по ссылке на первоисточник."
     ]
   };
 }
 
 function limitHeadline(value) {
-  const text = cleanSentence(value);
-  return trimWords(text, 10);
+  return cleanSentence(value);
 }
 
 function limitLead(value) {
@@ -481,10 +465,7 @@ function ensureUsefulLeads(leads, context) {
 
 function violatesHeadlineRules(headline, originalTitle) {
   const text = cleanSentence(headline);
-  const words = wordCount(text);
   return text.length < 18
-    || words < 5
-    || words > 10
     || !hasHeadlineVerb(text)
     || /[?!]|\.{3}|:/.test(text)
     || /^(how|why|what|when|where)\b/i.test(text)
@@ -554,16 +535,6 @@ function buildWhyItMattersHeadline(subject, category) {
 function joinHeadline(subject, action, object) {
   const cleanObject = object.replace(/\.$/, "").trim();
   return `${subject} ${action} ${cleanObject}`;
-}
-
-function trimWords(value, maxWords) {
-  const words = cleanText(value).split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return words.join(" ");
-  return words.slice(0, maxWords).join(" ");
-}
-
-function wordCount(value) {
-  return cleanText(value).split(/\s+/).filter(Boolean).length;
 }
 
 function hasHeadlineVerb(value) {
