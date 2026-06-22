@@ -50,8 +50,8 @@ const sources = [
   {
     id: "incrypted",
     name: "Incrypted",
-    home: "https://incrypted.com/",
-    feeds: ["https://incrypted.com/feed/", "https://incrypted.com/news/feed/"]
+    home: "https://incrypted.com/en/",
+    feeds: ["https://incrypted.com/en/feed/", "https://incrypted.com/en/news/feed/"]
   }
 ];
 
