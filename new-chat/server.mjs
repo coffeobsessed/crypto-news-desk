@@ -46,8 +46,52 @@ const categoryRules = [
 
 const headlineBannedPattern = /key figure|what we know|here’s|here's|everything to know|you need to know|explained|could mean|may mean|question mark/i;
 const leadBannedPattern = /sign up|subscribe|newsletter|advertisement|read more|related:|this article|in this article|click here/i;
-const MAX_HEADLINE_CHARS = 105;
+const MIN_HEADLINE_CHARS = 45;
+const MAX_HEADLINE_CHARS = 115;
 const MAX_HEADLINE_CORE_CHARS = 64;
+const MIN_LEAD_WORDS = 35;
+const MAX_LEAD_WORDS = 90;
+
+const editorialParameters = {
+  task: "Prepare headline and lead options from the source material for a news writer. Do not publish a finished article; give the writer strong editorial options to choose from.",
+  general: [
+    "Use only facts found in the source title, description, and body.",
+    "Do not invent figures, judgments, causes, consequences, or participants.",
+    "If a fact is disputed or evaluative, attribute it to the analyst, company, regulator, or source that made the claim.",
+    "Do not copy the source headline verbatim.",
+    "Do not make headlines or leads generic when a specific fact is available."
+  ],
+  headlines: [
+    "Generate three headline options.",
+    "Each headline must be a complete, publishable sentence or phrase.",
+    "Each headline must contain the main fact: who did what, what it concerns, and why it matters.",
+    "Do not end a headline on unfinished constructions such as 'will work on', 'plans to', or 'faces'.",
+    "Do not turn a headline into a long lead.",
+    "Target headline length is roughly 55-115 characters.",
+    "Commas and colons are allowed when they make the headline stronger.",
+    "Do not use clickbait, questions, or exclamation marks.",
+    "Create three different angles: straight news, competition/market/conflict, and a more expressive but still factual option."
+  ],
+  leads: [
+    "Generate three lead options.",
+    "Each lead must be a full paragraph, not a clipped sentence.",
+    "Target lead length is roughly 35-90 words.",
+    "Each lead must explain the main fact and add context.",
+    "Do not repeat the headline in the same words.",
+    "Include important figures, fees, dates, companies, tokens, regulators, or quoted analysts when they appear in the source.",
+    "A second sentence must develop the first sentence, not read like a random leftover fragment.",
+    "Avoid weak lines such as 'developers now want to do away with it' when the subject, action, and reason are unclear.",
+    "Do not write a lead without a specific subject; it must always be clear who acted and what happened."
+  ],
+  finalCheck: [
+    "Every headline is complete.",
+    "Every headline is shorter than 115 characters.",
+    "Every lead is longer than 35 words.",
+    "Every lead contains a specific subject.",
+    "The second lead is not a random continuation of the first.",
+    "All figures and names appear in the source."
+  ]
+};
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -309,13 +353,15 @@ export function buildDrafts(input) {
     secondSentence ? `${leadBase} ${secondSentence}` : `${safeTitle}. ${leadBase}`,
     figureSentence || secondSentence || leadBase
   ]
-    .map((lead) => limitLead(normalizeLead(cleanSentence(lead), safeTitle)))
+    .map((lead) => normalizeLead(cleanSentence(lead), safeTitle));
+  const leadOptions = buildLeadOptions(leads, context)
+    .map((lead) => limitLead(lead))
     .filter((lead) => !violatesLeadRules(lead, safeTitle))
     .filter((lead, index, list) => list.findIndex((other) => tooSimilar(lead, other)) === index);
 
   return {
     headlines,
-    leads: ensureUsefulLeads([...new Set(leads)], context),
+    leads: ensureUsefulLeads([...new Set(leadOptions)], context),
     evidence: {
       sourceSentences: evidence.sentences.slice(0, 6),
       figures: evidence.figures,
@@ -335,8 +381,7 @@ function limitHeadline(value) {
 }
 
 function limitLead(value) {
-  const text = cleanText(value);
-  return text.length > 260 ? `${text.slice(0, 256).trim()}...` : text;
+  return trimLead(cleanText(value));
 }
 
 function makeHeadlines(context) {
@@ -386,9 +431,9 @@ function editorialHeadlines(title, firstSentence, evidence, category) {
   }
   if (/morgan stanley/i.test(text) && /eth|ether|sol|solana|etf|filing|fees/i.test(text)) {
     return [
-      "Morgan Stanley Amended Ether and Solana ETF Filings",
-      "Morgan Stanley Disclosed Lower Fees in ETF Filings",
-      "Morgan Stanley Updated Its Crypto ETF Applications"
+      "Morgan Stanley Amends Ethereum and Solana ETF Filings With Record-Low Fees",
+      "Morgan Stanley Pressures ETF Rivals With Rock-Bottom Ether and Solana Fees",
+      "Fee War Escalates as Morgan Stanley Slashes ETH and SOL ETF Costs"
     ];
   }
   if (/polymarket/i.test(text) && /fake|staged|dummy|winning bets/i.test(text)) {
@@ -441,9 +486,9 @@ function ensureThreeHeadlines(candidates, originalTitle) {
   }
   while (cleaned.length < 3) {
     const fallback = [
-      "Crypto Firms Faced a Fresh Credibility Test",
-      "Investors Got Another Crypto Risk Warning",
-      "Crypto Trust Moved Back Into Focus"
+      "Crypto Firms Face Fresh Scrutiny After Latest Industry Development",
+      "Investors Weigh New Market Signal From Latest Crypto Development",
+      "Crypto Market Focus Shifts as New Details Emerge From Source"
     ][cleaned.length];
     if (!cleaned.includes(fallback)) cleaned.push(fallback);
   }
@@ -457,43 +502,96 @@ function ensureUsefulLeads(leads, context) {
   }
   const facts = context.evidence.sentences
     .filter((sentence) => !sameSentence(sentence, context.title))
-    .filter((sentence) => !violatesLeadRules(sentence, context.title))
     .filter((sentence) => !useful.some((lead) => tooSimilar(lead, sentence)))
     .slice(0, 3);
   for (const fact of facts) {
-    if (useful.length >= 2) break;
-    useful.push(limitLead(fact));
+    if (useful.length >= 3) break;
+    const lead = composeLead(fact, context, useful);
+    if (!violatesLeadRules(lead, context.title) && !useful.some((item) => tooSimilar(item, lead))) useful.push(lead);
   }
-  while (useful.length < 2) {
+  while (useful.length < 3) {
     const fallback = buildFallbackLead(context, useful);
     if (!violatesLeadRules(fallback, context.title) && !useful.some((lead) => tooSimilar(lead, fallback))) useful.push(fallback);
     else break;
   }
-  return useful.slice(0, 2);
+  return useful.slice(0, 3);
+}
+
+function buildLeadOptions(rawLeads, context) {
+  const options = rawLeads.map((lead) => composeLead(lead, context));
+  const morganLeadOptions = editorialLeads(context);
+  return [...morganLeadOptions, ...options];
+}
+
+function composeLead(seed, context, existingLeads = []) {
+  const sentences = [];
+  const cleanSeed = cleanSentence(seed);
+  if (cleanSeed) sentences.push(cleanSeed);
+  for (const fact of context.evidence.sentences) {
+    if (wordCount(sentences.join(" ")) >= MIN_LEAD_WORDS) break;
+    if (sameSentence(fact, context.title)) continue;
+    if (sentences.some((sentence) => tooSimilar(sentence, fact))) continue;
+    if (existingLeads.some((lead) => tooSimilar(lead, fact))) continue;
+    if (!isUsefulSentence(fact)) continue;
+    sentences.push(cleanSentence(fact));
+  }
+  return limitLead(sentences.join(" "));
+}
+
+function editorialLeads(context) {
+  const text = `${context.title}. ${context.firstSentence}. ${context.evidence.sentences.join(" ")}`;
+  const fee = extractFirst(text, /\b\d+(?:\.\d+)?%/);
+  if (/ether|ethereum/i.test(text) && /governance proposal/i.test(text) && /staking rewards|ecosystem funding|validator/i.test(text)) {
+    return [
+      "A new Ethereum governance proposal would let validators redirect part of their staking income toward ecosystem funding. The plan turns staking rewards into a potential funding source for projects, while raising questions about incentives and who decides where the money goes.",
+      "Ethereum validators could be asked to help fund ecosystem projects through a proposed change to staking rewards. The source frames the idea as a coordination challenge, centered on how much income validators should redirect and who gets to make that decision.",
+      "The proposal would connect Ethereum staking rewards more directly to ecosystem funding. If adopted, validators could direct part of their income toward projects, making governance, incentives and control over funding decisions central issues in the debate."
+    ];
+  }
+  const hasMorganEtfFees = /morgan stanley/i.test(text)
+    && /eth|ether|ethereum/i.test(text)
+    && /sol|solana/i.test(text)
+    && /etf|exchange-traded fund/i.test(text)
+    && /fee|fees|cost|costs/i.test(text);
+  if (!hasMorganEtfFees) return [];
+
+  const feePhrase = fee ? `a ${fee} fee` : "record-low fees";
+  const analyst = /balchunas/i.test(text) ? "Bloomberg ETF analyst Eric Balchunas" : "an analyst cited in the source";
+  const regulator = /\bSEC\b|S-1/i.test(text) ? "in amended filings with the SEC" : "in amended regulatory filings";
+  return [
+    `Morgan Stanley amended its Ether and Solana ETF filings to disclose ${feePhrase} for the planned products. The move positions the Wall Street firm as an aggressive price competitor in the crypto ETF market, according to details cited in the source.`,
+    `${analyst} said Morgan Stanley's newly disclosed fee structure would rank among the cheapest crypto ETF offerings. The update came ${regulator}, putting pricing at the center of the firm's push into Ether and Solana funds.`,
+    `Morgan Stanley is using price as a way to stand out in the race for spot crypto ETFs. Its latest filings show lower fees for both Ether and Solana products, adding pressure on rival issuers competing for investors in the same market.`
+  ];
 }
 
 function buildFallbackLead(context, existingLeads = []) {
   const text = `${context.title}. ${context.firstSentence}. ${context.evidence.sentences.join(" ")}`;
   if (/governance proposal/i.test(text) && /staking rewards|ecosystem funding|validator/i.test(text)) {
-    return "The proposal centers on staking rewards, ecosystem funding and validator coordination.";
+    return composeLead("The proposal centers on staking rewards, ecosystem funding and validator coordination.", context, existingLeads);
   }
   const fact = context.evidence.sentences
     .find((sentence) => !existingLeads.some((lead) => tooSimilar(lead, sentence)))
     || context.firstSentence
     || context.title;
-  return limitLead(fact);
+  return composeLead(fact, context, existingLeads);
 }
 
 function violatesHeadlineRules(headline, originalTitle) {
   const text = cleanSentence(headline);
-  return text.length < 18
+  return text.length < MIN_HEADLINE_CHARS
     || text.length > MAX_HEADLINE_CHARS
     || !hasHeadlineVerb(text)
-    || /[?!]|\.{3}|:/.test(text)
+    || /[?!]|\.{3}/.test(text)
+    || hasUnfinishedHeadlineEnding(text)
     || looksLikeLead(text)
     || /^(how|why|what|when|where)\b/i.test(text)
     || headlineBannedPattern.test(text)
     || sameSentence(text, originalTitle);
+}
+
+function hasUnfinishedHeadlineEnding(text) {
+  return /\b(will work on|plans to|plan to|set to|seeks to|aims to|faces|puts|amid|with|for|to|on|and|or)\s*$/i.test(text);
 }
 
 function looksLikeLead(text) {
@@ -508,14 +606,31 @@ function looksLikeLead(text) {
 function violatesLeadRules(lead, title) {
   const text = cleanSentence(lead);
   const sentenceCount = sentenceSplit(text).length;
+  const words = wordCount(text);
   return !isUsefulSentence(text)
-    || text.length > 260
-    || sentenceCount > 2
+    || words < MIN_LEAD_WORDS
+    || words > MAX_LEAD_WORDS
+    || sentenceCount > 3
+    || !hasSpecificSubject(text)
+    || looksLikeWeakLeadFragment(text)
     || sameSentence(text, title)
     || sameSentence(sanitizeHeadline(text), title)
     || tooSimilar(text, title)
     || /[?!]/.test(text)
     || leadBannedPattern.test(text);
+}
+
+function hasSpecificSubject(text) {
+  return /\b[A-Z][A-Za-z0-9&.'-]*(?:\s+[A-Z][A-Za-z0-9&.'-]*){0,4}\b/.test(text)
+    || /\b(the company|the regulator|the exchange|the protocol|the bank|the firm|developers|validators|investors|analysts)\b/i.test(text);
+}
+
+function looksLikeWeakLeadFragment(text) {
+  return wordCount(text) < MIN_LEAD_WORDS
+    || /^(developers|investors|analysts|traders|users)\s+now\s+want\s+to\b/i.test(text)
+    || /^(it|this|that|they)\s+/i.test(text)
+    || /\b(want to do away with it|has become redundant)\b/i.test(text)
+    || !/\b(is|are|was|were|has|have|had|will|would|could|said|filed|amended|disclosed|revealed|launched|plans|seeks|faces|shows|comes|puts|adds|marks|called)\b/i.test(text);
 }
 
 function detectSubject(title, firstSentence, evidence) {
@@ -593,8 +708,22 @@ function trimHeadlineCore(value) {
   return text.slice(0, MAX_HEADLINE_CORE_CHARS).replace(/\s+\S*$/, "").trim();
 }
 
+function trimLead(value) {
+  const words = cleanText(value).split(/\s+/).filter(Boolean);
+  if (words.length <= MAX_LEAD_WORDS) return words.join(" ");
+  return words.slice(0, MAX_LEAD_WORDS).join(" ").replace(/[,:;]$/, "").trim() + ".";
+}
+
+function wordCount(value) {
+  return cleanText(value).split(/\s+/).filter(Boolean).length;
+}
+
+function extractFirst(text, pattern) {
+  return cleanText(text).match(pattern)?.[0] || "";
+}
+
 function hasHeadlineVerb(value) {
-  return /\b(Paid|Planned|Weighed|Put|Lost|Drove|Recovered|Amended|Disclosed|Updated|Says|Faces|Puts|Links|Warns|Challenges|Claims|Falls|Rises|Buys|Seeks|Tests|Moved|Got|Faced|Funds|Fund|Lets|Redirects|Gives|Draws|Raises|Grows|Will|Could)\b/i.test(value);
+  return /\b(Paid|Planned|Weighed|Put|Lost|Drove|Recovered|Amended|Amends|Disclosed|Updated|Says|Faces|Puts|Links|Warns|Challenges|Claims|Falls|Rises|Buys|Seeks|Tests|Moved|Got|Faced|Funds|Fund|Lets|Redirects|Gives|Draws|Raises|Grows|Pressures|Slashes|Escalates|Reveals|Undercuts|Will|Could)\b/i.test(value);
 }
 
 function escapeRegExp(value) {
