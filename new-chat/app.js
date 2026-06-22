@@ -60,7 +60,7 @@ async function loadNews() {
   feed.innerHTML = "";
   try {
     const response = await fetch("/api/news");
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Не удалось загрузить новости");
     state.items = data.items || [];
     renderFeed();
@@ -114,7 +114,7 @@ async function openItem(url) {
   detail.scrollTop = 0;
   try {
     const response = await fetch(`/api/analyze-url?url=${encodeURIComponent(url)}`);
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Не удалось разобрать статью");
     if (state.loadingUrl !== url) return;
     renderDetail(item, data.article, data.drafts, url);
@@ -129,8 +129,20 @@ async function openItem(url) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ title: fallbackArticle.title, text: fallbackArticle.body })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     renderDetail(item, fallbackArticle, data.drafts, url);
+  }
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (text.trim().startsWith("<")) {
+      throw new Error("Сервер вернул HTML вместо данных. Обычно это значит, что открыт не Render-сайт, деплой ещё не завершился или сервер на Render упал.");
+    }
+    throw new Error("Сервер вернул ответ в неожиданном формате.");
   }
 }
 
