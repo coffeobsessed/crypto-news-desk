@@ -57,7 +57,7 @@ const categoryRules = [
 
 const headlineBannedPattern = /key figure|what we know|here’s|here's|everything to know|you need to know|explained|could mean|may mean|question mark/i;
 const leadBannedPattern = /sign up|subscribe|newsletter|advertisement|read more|related:|this article|in this article|click here/i;
-const MIN_HEADLINE_CHARS = 45;
+const MIN_HEADLINE_CHARS = 30;
 const MAX_HEADLINE_CHARS = 115;
 const MAX_HEADLINE_CORE_CHARS = 64;
 const TARGET_MIN_LEAD_WORDS = 35;
@@ -696,16 +696,26 @@ function buildFallbackLead(context, existingLeads = []) {
 
 function buildRelaxedLead(context, index) {
   const sourceTitle = asSentence(rewriteSourceHeadline(context.title));
-  const fact = asSentence(cleanSentence(context.evidence.sentences[index] || context.firstSentence || context.title));
-  const secondFact = asSentence(context.evidence.sentences.find((sentence) => !sameSentence(sentence, fact) && !sameSentence(sentence, context.title)) || context.firstSentence || "");
-  const figure = context.evidence.figures[index] || context.evidence.figures[0] || "";
-  const figureClause = figure ? ` The ${figure} figure gives the item a clear numerical peg.` : "";
+  const fact = asSentence(removeRepeatedLeadStart(cleanSentence(context.evidence.sentences[index] || context.firstSentence || context.title), sourceTitle));
+  const secondFact = asSentence(removeRepeatedLeadStart(
+    context.evidence.sentences.find((sentence) => !sameSentence(sentence, fact) && !sameSentence(sentence, context.title)) || context.firstSentence || "",
+    sourceTitle
+  ));
   const options = [
-    `${sourceTitle} ${fact && !sameSentence(fact, sourceTitle) ? fact : secondFact}${figureClause}`,
-    `${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}${figureClause}`,
-    `${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}${figureClause}`.trim()
+    `${sourceTitle} ${fact && !sameSentence(fact, sourceTitle) ? fact : secondFact}`,
+    `${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}`,
+    `${fact || sourceTitle} ${secondFact && !tooSimilar(secondFact, fact) ? secondFact : ""}`.trim()
   ];
   return limitLead(options[index] || options[0]);
+}
+
+function removeRepeatedLeadStart(sentence, titleSentence) {
+  const title = cleanSentence(titleSentence).replace(/\.$/, "");
+  const text = cleanSentence(sentence);
+  if (title && text.toLowerCase().startsWith(title.toLowerCase())) {
+    return text.slice(title.length).replace(/^[.\s]+/, "").trim();
+  }
+  return text;
 }
 
 function violatesHeadlineRules(headline, originalTitle, options = {}) {
@@ -909,6 +919,9 @@ function addFigureIfNatural(headline, figure) {
 
 function cleanSentence(value) {
   return cleanText(value)
+    .replace(/^Search\s*\/\s*News\s+Video\s+Prices\s+Research\s+Events\s+Data\s*&\s*Indices\s+Sponsored\s+Search\s*\/\s*en\s+/i, "")
+    .replace(/^.*?\biframe\][^>]*>\s*/i, "")
+    .replace(/^.*?\b(Markets|Finance|Policy|Tech|Business|Bitcoin|Ethereum|DeFi|Crypto ETF)\s+(?=[A-Z0-9$])/i, "")
     .replace(/^By\s+.+?(?:Edited by\s+.+?)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}.*?\b(?:min read|Artificial intelligence|Bitcoin|Crypto|Markets?)\.?\s*/i, "")
     .replace(/^By\s+.+?(?:\d{1,2},\s+\d{4}|\d+\s+min read)\s*/i, "")
     .replace(/\s*[-–—|]\s*(Cointelegraph|Decrypt|CoinDesk|The Block)\.?$/i, "")
@@ -926,7 +939,13 @@ function isUsefulSentence(sentence) {
     && !/^(Cointelegraph|Decrypt|CoinDesk|The Block)\.?$/i.test(text)
     && !looksLikeByline(text)
     && !looksLikeTickerStrip(text)
+    && !looksLikePageChrome(text)
     && !/sign up|subscribe|newsletter|advertisement|read more|related:/i.test(text);
+}
+
+function looksLikePageChrome(sentence) {
+  return /Search\s*\/\s*News\s+Video\s+Prices\s+Research\s+Events|Sponsored\s+Search|iframe\]|--ad-width|--ad-height|items-center|var\(--|Data\s*&\s*Indices/i.test(sentence)
+    || /^Search\s*\/\s*/i.test(sentence);
 }
 
 function looksLikeByline(sentence) {
