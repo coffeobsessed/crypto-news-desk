@@ -180,10 +180,8 @@ h3 {
 }
 
 .controls {
-  padding: 14px;
-  background:
-    radial-gradient(circle at 92% 18%, var(--yellow) 0 18px, transparent 19px),
-    var(--paper);
+  padding: 12px;
+  background: var(--paper);
 }
 
 .searchBox {
@@ -216,10 +214,10 @@ textarea {
 }
 
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .tab,
@@ -235,22 +233,20 @@ textarea {
 }
 
 .tab {
-  background: var(--blue-soft);
-}
-
-.tab:nth-child(2n) {
-  background: var(--pink-soft);
-}
-
-.tab:nth-child(3n) {
-  background: var(--yellow);
+  min-height: 30px;
+  border-color: rgba(216, 63, 53, .22);
+  padding: 0 9px;
+  background: rgba(255, 255, 255, .72);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .tab.active {
   border-color: var(--red);
   background: var(--red);
   color: #fff;
-  box-shadow: 0 7px 0 rgba(216, 63, 53, .18);
+  box-shadow: 0 4px 0 rgba(216, 63, 53, .14);
 }
 
 .primary {
@@ -355,12 +351,12 @@ textarea {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  border: 1px solid rgba(44, 44, 52, .12);
+  border: 1px solid rgba(216, 63, 53, .22);
   border-radius: 99px;
   padding: 0 9px;
-  background: #fff;
-  color: var(--red);
-  font-weight: 800;
+  background: rgba(255, 255, 255, .72);
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .newsItem h3 {
