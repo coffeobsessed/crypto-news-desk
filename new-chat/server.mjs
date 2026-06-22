@@ -81,6 +81,7 @@ const MAX_HEADLINE_CORE_CHARS = 64;
 const TARGET_MIN_LEAD_WORDS = 35;
 const MIN_LEAD_WORDS = 20;
 const MAX_LEAD_WORDS = 90;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
 
 const editorialParameters = {
   task: "Prepare headline and lead options from the source material for a news writer. Do not publish a finished article; give the writer strong editorial options to choose from.",
@@ -404,6 +405,160 @@ export function buildDrafts(input) {
       "Перед публикацией проверьте цитаты и числовые данные по ссылке на первоисточник."
     ]
   };
+}
+
+export async function buildDraftsWithAi(input) {
+  const fallback = buildDrafts(input);
+  if (!process.env.OPENAI_API_KEY) return fallback;
+
+  try {
+    const aiDrafts = await requestAiDrafts(input, fallback);
+    return {
+      ...fallback,
+      headlines: normalizeAiHeadlines(aiDrafts.headlines, fallback),
+      leads: normalizeAiLeads(aiDrafts.leads, fallback),
+      guardrails: [
+        "AI drafts are based on the source title, description and extracted article text.",
+        "Figures, names and claims should still be checked against the original source before publication."
+      ],
+      ai: { used: true, model: OPENAI_MODEL }
+    };
+  } catch (error) {
+    return {
+      ...fallback,
+      ai: { used: false, error: error.message },
+      guardrails: [
+        ...fallback.guardrails,
+        "AI generation was unavailable, so these drafts used the local fallback generator."
+      ]
+    };
+  }
+}
+
+async function requestAiDrafts(input, fallback) {
+  const article = {
+    title: cleanText(input.title || ""),
+    description: cleanText(input.description || ""),
+    body: trimForPrompt(cleanText(input.body || input.text || ""), 6500),
+    category: fallback.category?.label || "Other",
+    sourceSentences: fallback.evidence?.sourceSentences || [],
+    figures: fallback.evidence?.figures || [],
+    entities: fallback.evidence?.entities || []
+  };
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: buildAiInstructions(),
+      input: `Source material:\n${JSON.stringify(article, null, 2)}\n\nReturn JSON only.`,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "news_draft_options",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["headlines", "leads"],
+            properties: {
+              headlines: {
+                type: "array",
+                minItems: 3,
+                maxItems: 3,
+                items: { type: "string" }
+              },
+              leads: {
+                type: "array",
+                minItems: 3,
+                maxItems: 3,
+                items: { type: "string" }
+              }
+            }
+          }
+        }
+      },
+      max_output_tokens: 1400,
+      store: false
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error?.message || `OpenAI API error ${response.status}`);
+  }
+
+  const text = extractResponseText(data);
+  const parsed = JSON.parse(text);
+  if (!Array.isArray(parsed.headlines) || !Array.isArray(parsed.leads)) {
+    throw new Error("AI response did not include headlines and leads");
+  }
+  return parsed;
+}
+
+function buildAiInstructions() {
+  return [
+    "You are an editorial assistant for a crypto news writer.",
+    "Prepare headline and lead options from the source material. Do not write a finished article; give strong editorial options to choose from.",
+    "Use only facts found in the source title, description, body, extracted sentences, figures, and entities.",
+    "Do not invent figures, judgments, causes, consequences, quotes, dates, companies, regulators, tokens, or participants.",
+    "If a fact is disputed or evaluative, attribute it to the analyst, company, regulator, publication, or source that made the claim.",
+    "Do not copy the source headline verbatim.",
+    "Do not use page chrome, navigation, ad text, CSS fragments, iframes, newsletter text, or unrelated site boilerplate.",
+    "Generate exactly three headline options.",
+    "Each headline must be complete and publishable on its own.",
+    "Each headline should contain the main fact: who did what, what it concerns, and why it matters.",
+    "Do not end a headline on unfinished constructions such as 'will work on', 'plans to', or 'faces'.",
+    "Do not turn a headline into a long lead.",
+    "Target headline length is roughly 55-115 characters, but shorter is acceptable if it is complete and specific.",
+    "Commas and colons are allowed when they make the headline stronger.",
+    "Do not use clickbait, questions, or exclamation marks.",
+    "Create three different angles: straight news; competition, market or conflict; more expressive but still factual.",
+    "Generate exactly three lead options.",
+    "Each lead must be a full paragraph, not a clipped sentence.",
+    "Target lead length is roughly 35-90 words.",
+    "Each lead should explain the main fact and add useful context.",
+    "Do not repeat the headline in the same words.",
+    "Include important figures, fees, dates, companies, tokens, regulators, or quoted analysts when they appear in the source.",
+    "A second sentence must develop the first sentence, not read like a random leftover fragment.",
+    "Never use meta phrases such as 'the article centers on', 'the source material says', 'main actor in the story', or 'the figure gives the item a peg'.",
+    "Return JSON only, with keys: headlines and leads."
+  ].join("\n");
+}
+
+function extractResponseText(data) {
+  if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
+  const text = data.output
+    ?.flatMap((item) => item.content || [])
+    ?.map((content) => content.text || "")
+    ?.join("")
+    ?.trim();
+  if (text) return text;
+  throw new Error("OpenAI response had no text output");
+}
+
+function trimForPrompt(text, maxChars) {
+  return text.length > maxChars ? `${text.slice(0, maxChars).trim()}...` : text;
+}
+
+function normalizeAiHeadlines(headlines, fallback) {
+  const clean = headlines
+    .map((headline) => limitHeadline(sanitizeHeadline(headline)))
+    .filter((headline) => headline && !looksLikePageChrome(headline))
+    .filter((headline, index, list) => list.findIndex((item) => tooSimilar(item, headline)) === index);
+  return ensureThreeHeadlines([...clean, ...fallback.headlines], fallback.headlines[0] || fallback.category?.label || "Crypto News");
+}
+
+function normalizeAiLeads(leads, fallback) {
+  const clean = leads
+    .map((lead) => limitLead(cleanSentence(lead)))
+    .filter((lead) => lead && !looksLikePageChrome(lead) && !looksLikeWeakLeadFragment(lead))
+    .filter((lead, index, list) => list.findIndex((item) => tooSimilar(item, lead)) === index);
+  return [...clean, ...fallback.leads].slice(0, 3);
 }
 
 function limitHeadline(value) {
@@ -1021,7 +1176,7 @@ async function handleApi(req, res, url) {
     try {
       const html = await fetchText(target);
       const article = extractArticle(html);
-      return json(res, 200, { article, drafts: buildDrafts(article) });
+      return json(res, 200, { article, drafts: await buildDraftsWithAi(article) });
     } catch (error) {
       return json(res, 502, { error: error.message });
     }
@@ -1031,7 +1186,7 @@ async function handleApi(req, res, url) {
     const body = await readRequest(req);
     const input = JSON.parse(body || "{}");
     const article = { title: input.title || "", description: input.description || "", body: input.text || "" };
-    return json(res, 200, { article, drafts: buildDrafts(article) });
+    return json(res, 200, { article, drafts: await buildDraftsWithAi(article) });
   }
 
   return json(res, 404, { error: "Not found" });
