@@ -44,8 +44,8 @@ const sources = [
   {
     id: "forklog",
     name: "ForkLog",
-    home: "https://forklog.com/",
-    feeds: ["https://forklog.com/feed", "https://forklog.com/feed/"]
+    home: "https://forklog.com/en/",
+    feeds: ["https://forklog.com/en/feed/", "https://forklog.com/en/feed"]
   },
   {
     id: "incrypted",
